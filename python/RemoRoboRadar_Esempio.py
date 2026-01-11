@@ -1,161 +1,61 @@
-"""
-Client Python per ESP32 RemoRoboRadar
-
-Funzionalità:
-- Controllo servomotore
-- Lettura distanza ultrasuoni
-- Impostazione distanza di sicurezza
-- Scansione angolare (0–180 gradi)
-
-Requisiti:
-- Python 3.x
-- requests
-"""
-
 import requests
-import time
+import matplotlib.pyplot as plt
 
-# ===============================
-# CONFIGURAZIONE
-# ===============================
+ESP32_IP = "http://192.168.1.200"  # Cambia con l'IP statico dell'ESP32
 
-ESP32_IP = "192.168.1.200"     # IP dell'ESP32
-BASE_URL = "http://" + ESP32_IP
-
-
-# ===============================
-# FUNZIONI DI SUPPORTO
-# ===============================
-
-def print_separator():
-    print("-" * 50)
-
-
-def check_response(response):
-    """
-    Stampa informazioni di base sulla risposta HTTP
-    """
-    print("Status code:", response.status_code)
-    print("Risposta:", response.text)
-
-
-# ===============================
-# FUNZIONI API ESP32
-# ===============================
-
+# --- Funzioni API ---
 def set_servo(angle):
-    """
-    Imposta l'angolo del servomotore
-    angle: valore intero tra 0 e 180
-    """
-    print_separator()
-    print("Impostazione servo a", angle, "gradi")
-
-    url = BASE_URL + "/setServo"
-    params = {"angle": angle}
-
-    response = requests.get(url, params=params)
-    check_response(response)
-
+    """Muove il servo all'angolo specificato"""
+    url = f"{ESP32_IP}/setServo"
+    r = requests.get(url, params={"angle": angle})
+    print("↔️  Risposta ESP32:", r.text)
 
 def get_distance():
-    """
-    Richiede la distanza misurata dal sensore
-    """
-    print_separator()
-    print("Richiesta distanza istantanea")
-
-    url = BASE_URL + "/distance"
-    response = requests.get(url)
-
-    check_response(response)
-
+    """Ottiene la distanza istantanea dal sensore"""
+    url = f"{ESP32_IP}/distance"
+    r = requests.get(url)
+    print("📏 Distanza:", r.text, "cm")
     try:
-        distance = float(response.text)
-        print("Distanza letta:", distance, "cm")
-        return distance
-    except ValueError:
-        print("Errore nella conversione della distanza")
+        return float(r.text)
+    except:
         return None
 
-
-def set_safe_distance(value):
-    """
-    Imposta la distanza di sicurezza sull'ESP32
-    value: distanza in cm (>0)
-    """
-    print_separator()
-    print("Impostazione distanza di sicurezza a", value, "cm")
-
-    url = BASE_URL + "/setSafeDistance"
-    params = {"value": value}
-
-    response = requests.get(url, params=params)
-    check_response(response)
-
-
 def scan_area():
-    """
-    Avvia una scansione angolare completa (0–180)
-    Restituisce una lista di distanze
-    """
-    print_separator()
-    print("Avvio scansione angolare")
-
-    url = BASE_URL + "/scan"
-    response = requests.get(url)
-
-    check_response(response)
-
+    """Effettua una scansione da 0° a 180° e restituisce una lista di distanze"""
+    url = f"{ESP32_IP}/scan"
+    r = requests.get(url)
+    print("🔄 Risultato scansione:", r.text)
     try:
-        distances = eval(response.text)
-        print("Numero di misure ricevute:", len(distances))
+        distances = eval(r.text)  # converte "[12,34,56]" in lista Python
         return distances
-    except Exception:
-        print("Errore nella lettura della scansione")
+    except:
         return []
 
-
-# ===============================
-# PROGRAMMA PRINCIPALE
-# ===============================
-
-def main():
-    print("Client Python - ESP32 RoboRadar")
-    print("Target:", BASE_URL)
-
-    # 1. Muove il servo in tre posizioni
-    set_servo(0)
-    time.sleep(1)
-
-    set_servo(90)
-    time.sleep(1)
-
-    set_servo(180)
-    time.sleep(1)
-
-    # 2. Legge la distanza attuale
-    get_distance()
-
-    # 3. Imposta la distanza di sicurezza
-    set_safe_distance(30)
-
-    # 4. Esegue una scansione completa
-    scan = scan_area()
-
-    print_separator()
-    print("Valori di scansione:")
-    for index, value in enumerate(scan):
-        angle = index * 15
-        print("Angolo", angle, "->", value, "cm")
-
-    print_separator()
-    print("Fine esecuzione client")
+def set_safe_distance(value):
+    """Imposta la distanza di sicurezza in cm"""
+    url = f"{ESP32_IP}/setSafeDistance"
+    r = requests.get(url, params={"value": value})
+    print("⚠️  Risposta ESP32:", r.text)
 
 
-# ===============================
-# AVVIO
-# ===============================
+# --- DEMO ---
 
-if __name__ == "__main__":
-    main()
+# Muovere il servo
+#set_servo(5)
+set_servo(99)
+#set_servo(180)
+
+# Leggere distanza attuale
+d = get_distance()
+
+# Impostare soglia di sicurezza
+set_safe_distance(5)
+
+# Fare una scansione e disegnarla
+
+scan = scan_area()
+if scan:
+    angles = list(range(0, 181, 15))
+    plt.polar([a * 3.14/180 for a in angles], scan, marker="o")
+    plt.title("Scansione Radar ESP32")
+    plt.show()
